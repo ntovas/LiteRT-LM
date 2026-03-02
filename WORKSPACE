@@ -239,6 +239,7 @@ rust_register_toolchains(
         "aarch64-linux-android",
         "aarch64-apple-ios",
         "aarch64-apple-ios-sim",
+        "x86_64-linux-android",
     ],
 )
 
@@ -247,6 +248,7 @@ load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencie
 crate_universe_dependencies()
 
 load("@rules_rust//crate_universe:defs.bzl", "crate", "crates_repository")
+load("@rules_rust//rust/platform:triple_mappings.bzl", "SUPPORTED_PLATFORM_TRIPLES")
 
 crates_repository(
     name = "crate_index",
@@ -274,6 +276,9 @@ crates_repository(
     lockfile = "//:cargo-bazel-lock.json",
     manifests = [
         "//:Cargo.toml",
+    ],
+    supported_platform_triples = SUPPORTED_PLATFORM_TRIPLES + [
+        "x86_64-linux-android",
     ],
 )
 
@@ -444,9 +449,9 @@ google_tensor()
 
 http_archive(
     name = "nanobind_json",
+    build_file = "@//:BUILD.nanobind_json",
+    patches = ["@//:PATCH.nanobind_json"],
+    sha256 = "72cb4cdbf8108c7dd2dc669347669f2cc1acf4f943588f96661701f27f778912",
     strip_prefix = "nanobind_json-e1953530697f61cbca9dc9b4f51561ea785cb09d",
     urls = ["https://github.com/ianhbell/nanobind_json/archive/e1953530697f61cbca9dc9b4f51561ea785cb09d.zip"],
-    sha256 = "72cb4cdbf8108c7dd2dc669347669f2cc1acf4f943588f96661701f27f778912",
-    patches = ["@//:PATCH.nanobind_json"],
-    build_file = "@//:BUILD.nanobind_json",
 )
