@@ -36,9 +36,13 @@
 #include "runtime/components/preprocessor/image_preprocessor.h"
 #include "runtime/engine/io_types.h"
 #include "runtime/util/status_macros.h"  // IWYU pragma: keep
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#endif
 #include "stb_image.h"  // from @stb
+#ifndef STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
+#endif
 #include "stb_image_resize2.h"  // from @stb
 
 namespace litert::lm {
