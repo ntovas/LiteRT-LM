@@ -1,4 +1,4 @@
-name: "CI-Build-CMake"
+name: "CI-CMake"
 on:
   push:
     branches: [ "main" ]
@@ -16,9 +16,9 @@ permissions:
   actions: write
 
 env:
-  MODEL_KEY: gemma-3-270m-it-v1
-  MODEL_PATH: ./models/gemma3-270m-it-q8.litertlm
-  MODEL_URL: https://huggingface.co/litert-community/gemma-3-270m-it/resolve/main/gemma3-270m-it-q8.litertlm
+  MODEL_KEY: gemma-3-1b-it-v1
+  MODEL_PATH: ./models/gemma3-1b-it-int4.litertlm
+  MODEL_URL: https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.litertlm
   CCACHE_DIR: "${{ github.workspace }}/.ccache"
   CCACHE_SLOPPINESS: "time_macros"
 
@@ -45,20 +45,15 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Install Python Dependencies
+        run: python3 -m pip install --break-system-packages pytest==8.3.4
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Cache Model
-        id: cache-model
-        uses: actions/cache@v4
-        with:
-          path: ./models
-          key: ${{ env.MODEL_KEY }}
-
       - name: Download Model
-        if: steps.cache-model.outputs.cache-hit != 'true'
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
@@ -133,12 +128,8 @@ jobs:
       - name: Build
         run: cmake --build cmake/build --config Release --parallel $(nproc)
 
-      - name: Run Inference Test
-        run: |
-          ./cmake/build/litert_lm_main \
-            --backend=cpu \
-            --model_path=${{ env.MODEL_PATH }} \
-            --input_prompt="How tall is the Eiffel Tower?"
+      - name: Run pytest
+        run: python3 -m pytest tools/test/ --model-path=${{ env.MODEL_PATH }} --build-system=cmake
 
       - name: Save CCache on Failure
         if: failure()

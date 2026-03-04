@@ -15,6 +15,7 @@ on:
         type: boolean
         default: true
 
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -27,6 +28,10 @@ jobs:
       actions: write  # For gh cache delete.
       contents: write  # For gh release upload.
     env:
+      MODEL_KEY: gemma-3-1b-it-v1
+      MODEL_PATH: ./models/gemma3-1b-it-int4.litertlm
+      MODEL_URL: https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.litertlm
+
       GH_TOKEN: ${{ github.token }}  # For gh release upload.
       REFRESH_CACHE: ${{ github.event_name == 'schedule' ||
                          (github.event_name == 'workflow_dispatch' && inputs.REFRESH_CACHE) }}
@@ -80,6 +85,18 @@ jobs:
           STEPS_BAZEL_CACHE_OUTPUTS_CACHE_PRIMARY_KEY: ${{ steps.bazel-cache.outputs.cache-primary-key }}
           STEPS_BAZEL_CACHE_OUTPUTS_CACHE_MATCHED_KEY: ${{ steps.bazel-cache.outputs.cache-matched-key }}
 
+      - name: Download Model
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          mkdir -p ./models
+          echo "Downloading model from Hugging Face..."
+          curl -L --retry 5 -f \
+            -H "Authorization: Bearer $HF_TOKEN" \
+            -o ${{ env.MODEL_PATH }} \
+            "${{ env.MODEL_URL }}"
+          ls -lh ${{ env.MODEL_PATH }}
+
       - name: Run bazel build on MacOS.
         run: |
           bazel build --disk_cache=~/.cache/bazel-macos \
@@ -95,6 +112,12 @@ jobs:
       - name: Run bazel test on MacOS.
         run: |
           bazel test --disk_cache=~/.cache/bazel-macos --test_output=errors //...
+
+      - name: Install pytest
+        run: python3 -m pip install --break-system-packages pytest==8.3.4
+
+      - name: Run pytest
+        run: pytest tools/test/ --model-path=${{ env.MODEL_PATH }} --build-system=bazel
 
       - name: Run bazel build for iOS Simulator.
         run: |
