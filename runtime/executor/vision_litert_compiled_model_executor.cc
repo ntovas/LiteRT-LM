@@ -14,6 +14,8 @@
 
 #include "runtime/executor/vision_litert_compiled_model_executor.h"
 
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -384,7 +386,30 @@ absl::StatusOr<ExecutorVisionData> VisionLiteRtCompiledModelExecutor::Encode(
                      adapter_output_tensor_buffers.size()));
   }
 
-  auto& input_buffers = vision_encoder_->GetMutableInputBuffers();
+  // Recreate input buffers to match the actual dynamic input sizes instead of
+  // reusing pre-allocated buffers which may be too small.
+  LITERT_ASSIGN_OR_RETURN(
+      auto input_buffers,
+      vision_encoder_->GetCompiledModel().CreateInputBuffers(
+          /*signature_index=*/0));
+
+  // Extract grid dimensions from positions_xy up front (needed for patch
+  // reorder and mRoPE grid_thw).
+  int grid_h = 0, grid_w = 0;
+  {
+    LITERT_ASSIGN_OR_RETURN(auto positions_tensor_type,
+                            input_maps.at(kPositionsXy).TensorType());
+    int num_orig_patches = positions_tensor_type.Layout().Dimensions()[1];
+    if (num_orig_patches > 0) {
+      LITERT_ASSIGN_OR_RETURN(
+          auto pos_span,
+          ReferTensorBufferAsSpan<int32_t>(input_maps.at(kPositionsXy)));
+      int last_x = pos_span[(num_orig_patches - 1) * 2];      // W - 1
+      int last_y = pos_span[(num_orig_patches - 1) * 2 + 1];  // H - 1
+      grid_h = last_y + 1;
+      grid_w = last_x + 1;
+    }
+  }
 
   absl::flat_hash_map<absl::string_view, litert::TensorBuffer>
       encoder_input_maps;
@@ -393,11 +418,60 @@ absl::StatusOr<ExecutorVisionData> VisionLiteRtCompiledModelExecutor::Encode(
     LITERT_ASSIGN_OR_RETURN(auto input_index,
                             vision_encoder_->GetCompiledModel().FindInputIndex(
                                 /*signature_index=*/0, key));
+    LITERT_ASSIGN_OR_RETURN(auto input_tensor_type,
+                            value.TensorType());
+    LITERT_ASSIGN_OR_RETURN(auto input_size, value.Size());
+    LITERT_ASSIGN_OR_RETURN(auto buffer_size, input_buffers[input_index].Size());
+    if (input_size > buffer_size) {
+      LITERT_ASSIGN_OR_RETURN(
+          input_buffers[input_index],
+          TensorBuffer::CreateManaged(
+              env_, TensorBufferType::kHostMemory,
+              input_tensor_type, input_size));
+    }
     if (tensor_type.ElementType() == ElementType::Float32) {
       LITERT_ASSIGN_OR_RETURN(auto input_data,
                               ReferTensorBufferAsSpan<float>(value));
-      LITERT_RETURN_IF_ERROR(
-          input_buffers[input_index].Write<float>(input_data));
+      if (key == kImages &&
+          vision_executor_properties_.patch_num_shrink_factor.has_value() &&
+          *vision_executor_properties_.patch_num_shrink_factor > 1 &&
+          grid_h > 0 && grid_w > 0) {
+        // Reorder image patches from raster order (row-by-row as provided by
+        // runtime preprocessor) to merge-grouped order (2x2 spatial blocks
+        // grouped together) to match precomputed position/rotary embeddings
+        // baked into the TFLite encoder model.
+        const int merge_size = static_cast<int>(
+            std::sqrt(*vision_executor_properties_.patch_num_shrink_factor));
+        if (grid_h % merge_size != 0 || grid_w % merge_size != 0) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "Grid dimensions (", grid_h, "x", grid_w,
+              ") must be divisible by merge_size (", merge_size, ")"));
+        }
+        const int num_patches_total = grid_h * grid_w;
+        const int patch_dim =
+            static_cast<int>(input_data.size()) / num_patches_total;
+        std::vector<float> reordered(input_data.size());
+        int merge_idx = 0;
+        for (int br = 0; br < grid_h / merge_size; ++br) {
+          for (int bc = 0; bc < grid_w / merge_size; ++bc) {
+            for (int ir = 0; ir < merge_size; ++ir) {
+              for (int ic = 0; ic < merge_size; ++ic) {
+                int raster_idx =
+                    (br * merge_size + ir) * grid_w + (bc * merge_size + ic);
+                std::memcpy(&reordered[merge_idx * patch_dim],
+                            &input_data[raster_idx * patch_dim],
+                            patch_dim * sizeof(float));
+                ++merge_idx;
+              }
+            }
+          }
+        }
+        LITERT_RETURN_IF_ERROR(input_buffers[input_index].Write<float>(
+            absl::MakeConstSpan(reordered)));
+      } else {
+        LITERT_RETURN_IF_ERROR(
+            input_buffers[input_index].Write<float>(input_data));
+      }
     } else if (tensor_type.ElementType() == ElementType::Int32) {
       LITERT_ASSIGN_OR_RETURN(auto input_data,
                               ReferTensorBufferAsSpan<int32_t>(value));
@@ -473,8 +547,20 @@ absl::StatusOr<ExecutorVisionData> VisionLiteRtCompiledModelExecutor::Encode(
       ReferTensorBufferAsSpan<float>(adapter_output_tensor_buffers[0]));
   LITERT_RETURN_IF_ERROR(output_tensor.Write<float>(adapter_output_data.subspan(
       0, num_patches * output_tensor_type.Layout().Dimensions()[2])));
-  return ExecutorVisionData(std::move(output_tensor),
+  // grid_thw for mRoPE (grid dimensions already extracted above).
+  std::array<int, 3> grid_thw = {1, grid_h, grid_w};
+
+  // Persist local buffers to prevent dangling pointers in the XNNPACK runtime.
+  // The XNNPACK runtime may cache data pointers passed via Run(); destroying
+  // the buffers before the compiled model is destroyed causes heap corruption
+  // detected by Scudo during Engine.close().
+  last_encoder_input_buffers_ = std::move(input_buffers);
+  last_encoder_output_buffers_ = std::move(encoder_output_buffers);
+
+  ExecutorVisionData result(std::move(output_tensor),
                             /*per_layer_embeddings=*/std::nullopt);
+  result.SetGridThwList({grid_thw});
+  return result;
 }
 
 absl::StatusOr<VisionExecutorProperties>

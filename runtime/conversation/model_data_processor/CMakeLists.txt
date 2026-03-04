@@ -95,6 +95,18 @@ target_include_directories(runtime_conversation_model_data_processor_qwen3_data_
 )
 
 # ==============================================================================
+# Qwen3.5 Data Processor Config
+# ==============================================================================
+add_litertlm_library(runtime_conversation_model_data_processor_qwen3p5_data_processor_config INTERFACE)
+add_library(LiteRTLM::Runtime::Conversation::Processor::Qwen3p5Config ALIAS runtime_conversation_model_data_processor_qwen3p5_data_processor_config)
+
+target_include_directories(runtime_conversation_model_data_processor_qwen3p5_data_processor_config
+  INTERFACE
+    ${GENERATED_SRC_DIR}
+    ${LITERTLM_INCLUDE_PATHS}
+)
+
+# ==============================================================================
 # Model Data Processor Interface
 # ==============================================================================
 add_litertlm_library(runtime_conversation_model_data_processor INTERFACE)
@@ -236,6 +248,36 @@ target_link_libraries(runtime_conversation_model_data_processor_qwen3_data_proce
 )
 
 # ==============================================================================
+# Qwen3.5 Data Processor
+# ==============================================================================
+add_litertlm_library(runtime_conversation_model_data_processor_qwen3p5_data_processor STATIC
+  qwen3p5_data_processor.cc
+)
+add_library(LiteRTLM::Runtime::Conversation::Processor::Qwen3p5 ALIAS runtime_conversation_model_data_processor_qwen3p5_data_processor)
+
+target_include_directories(runtime_conversation_model_data_processor_qwen3p5_data_processor
+  PUBLIC
+    ${GENERATED_SRC_DIR}
+    ${LITERTLM_INCLUDE_PATHS}
+)
+
+target_link_libraries(runtime_conversation_model_data_processor_qwen3p5_data_processor
+  PUBLIC
+    LiteRTLM::Runtime::Conversation::Processor::ConfigRegistry
+    LiteRTLM::Runtime::Conversation::Processor::Interface
+    LiteRTLM::Runtime::Conversation::Processor::Qwen3p5Config
+    LiteRTLM::Runtime::Conversation::Processor::DataUtils
+    LiteRTLM::Runtime::Components::Preprocessor::Image
+    LiteRTLM::Runtime::Components::Preprocessor::StbImage
+    LiteRTLM::Runtime::Components::ToolUse::ParserUtils
+    runtime_conversation_io_types
+    runtime_engine_io_types
+    runtime_util_litert_status_util
+    runtime_util_memory_mapped_file
+    LITERTLM_DEPS
+)
+
+# ==============================================================================
 # Model Data Processor Factory
 # ==============================================================================
 add_litertlm_library(runtime_conversation_model_data_processor_factory STATIC
@@ -259,6 +301,8 @@ target_link_libraries(runtime_conversation_model_data_processor_factory
     LiteRTLM::Runtime::Conversation::Processor::Interface
     LiteRTLM::Runtime::Conversation::Processor::Qwen3
     LiteRTLM::Runtime::Conversation::Processor::Qwen3Config
+    LiteRTLM::Runtime::Conversation::Processor::Qwen3p5
+    LiteRTLM::Runtime::Conversation::Processor::Qwen3p5Config
     LiteRTLM::Runtime::Components::Tokenizer::Interface
     LiteRTLM::Runtime::Conversation::IoTypes
     runtime_util_litert_status_util
@@ -285,4 +329,6 @@ target_link_libraries(runtime_conversation_model_data_processor_libs INTERFACE
   LiteRTLM::Runtime::Conversation::Processor::Factory
   LiteRTLM::Runtime::Conversation::Processor::Qwen3
   LiteRTLM::Runtime::Conversation::Processor::Qwen3Config
+  LiteRTLM::Runtime::Conversation::Processor::Qwen3p5
+  LiteRTLM::Runtime::Conversation::Processor::Qwen3p5Config
 )

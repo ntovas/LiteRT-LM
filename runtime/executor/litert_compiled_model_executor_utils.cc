@@ -68,6 +68,9 @@ constexpr std::array<absl::string_view, 1> kPerLayerEmbeddingNames = {
 // Possible input int32 param names:
 constexpr std::array<absl::string_view, 1> kInputInt32ParamNames = {
     "param_tensor"};
+// Possible input mRoPE position names (Qwen3.5-VL):
+constexpr std::array<absl::string_view, 2> kInputMRoPEPositionNames = {
+    "position_ids", "mrope_positions"};
 // Possible output logits names:
 constexpr std::array<absl::string_view, 1> kOutputLogitsNames = {"logits"};
 
@@ -137,6 +140,10 @@ absl::StatusOr<ModelSignatures> GetModelSignaturesFromInputOutputNames(
     }
     if (absl::c_linear_search(kInputInt32ParamNames, input_name)) {
       model_signatures.input_int32_param = std::string(input_name);
+      continue;
+    }
+    if (absl::c_linear_search(kInputMRoPEPositionNames, input_name)) {
+      model_signatures.input_mrope_positions = std::string(input_name);
       continue;
     }
   }

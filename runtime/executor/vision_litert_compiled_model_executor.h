@@ -251,6 +251,12 @@ class VisionLiteRtCompiledModelExecutor : public VisionExecutor {
 
   // The vision executor properties.
   VisionExecutorProperties vision_executor_properties_;
+
+  // Persisted buffers from the last map-based Encode() call.  Kept alive to
+  // prevent dangling pointers in the XNNPACK runtime, which may cache data
+  // pointers passed via Run().
+  std::vector<TensorBuffer> last_encoder_input_buffers_;
+  std::vector<TensorBuffer> last_encoder_output_buffers_;
 };
 
 }  // namespace litert::lm

@@ -236,6 +236,29 @@ cc_test(
 )
 
 cc_library(
+    name = "qwen35_position_ids",
+    srcs = ["qwen35_position_ids.cc"],
+    hdrs = ["qwen35_position_ids.h"],
+    deps = [
+        ":llm_executor_io_types",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/types:span",
+        "//runtime/util:litert_status_util",
+    ],
+)
+
+cc_test(
+    name = "qwen35_position_ids_test",
+    srcs = ["qwen35_position_ids_test.cc"],
+    deps = [
+        ":qwen35_position_ids",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "llm_litert_compiled_model_executor",
     srcs = ["llm_litert_compiled_model_executor.cc"],
     hdrs = ["llm_litert_compiled_model_executor.h"],
@@ -245,6 +268,7 @@ cc_library(
         ":litert_compiled_model_executor_utils",
         ":llm_executor",
         ":llm_executor_io_types",
+        ":qwen35_position_ids",
         ":llm_executor_processed_tokens",
         ":llm_executor_settings",
         ":llm_litert_compiled_model_cache_utils",

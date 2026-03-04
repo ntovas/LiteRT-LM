@@ -15,6 +15,7 @@
 #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_LITERT_COMPILED_MODEL_EXECUTOR_H_
 #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_LITERT_COMPILED_MODEL_EXECUTOR_H_
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -324,6 +325,9 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
 
   // The MTP drafter model.
   std::unique_ptr<CompiledModel> mtp_drafter_model_;
+  // Grid thw list for the current prefill call (set in Prefill, consumed in
+  // PrefillInternal). Only valid for models with input_mrope_positions.
+  std::vector<std::array<int, 3>> mrope_pending_grid_thw_;
 };
 
 // The static executor for the prefill-decode compiled model.
