@@ -14,6 +14,7 @@
 
 #include "runtime/util/executor_data_util.h"
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <utility>
@@ -103,8 +104,16 @@ absl::StatusOr<T> CombineExecutorDataImpl(std::vector<T>& executor_data) {
     combined_tensor_buffer_ptr += embeddings_size;
   }
   if constexpr (std::is_same_v<T, ExecutorVisionData>) {
-    return ExecutorVisionData(std::move(combined_tensor_buffer),
-                              /*per_layer_embeddings=*/std::nullopt);
+    std::vector<std::array<int, 3>> combined_grid_thw;
+    for (int i = 0; i < num_executor_data; ++i) {
+      for (const auto& thw : executor_data[i].GetGridThwList()) {
+        combined_grid_thw.push_back(thw);
+      }
+    }
+    ExecutorVisionData combined(std::move(combined_tensor_buffer),
+                                /*per_layer_embeddings=*/std::nullopt);
+    combined.SetGridThwList(std::move(combined_grid_thw));
+    return combined;
   } else if constexpr (std::is_same_v<T, ExecutorAudioData>) {
     int num_audio_tokens = 0;
     for (const auto& executor_data : executor_data) {

@@ -14,6 +14,7 @@
 
 #include "runtime/executor/vision_litert_compiled_model_executor.h"
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -473,8 +474,27 @@ absl::StatusOr<ExecutorVisionData> VisionLiteRtCompiledModelExecutor::Encode(
       ReferTensorBufferAsSpan<float>(adapter_output_tensor_buffers[0]));
   LITERT_RETURN_IF_ERROR(output_tensor.Write<float>(adapter_output_data.subspan(
       0, num_patches * output_tensor_type.Layout().Dimensions()[2])));
-  return ExecutorVisionData(std::move(output_tensor),
+  // Extract grid_thw for mRoPE: read last (x, y) from positions_xy.
+  // positions_xy layout: [B, N, 2] row-major, last entry = (W-1, H-1).
+  std::array<int, 3> grid_thw = {1, 0, 0};
+  {
+    LITERT_ASSIGN_OR_RETURN(auto positions_tensor_type,
+                            input_maps.at(kPositionsXy).TensorType());
+    int num_orig_patches = positions_tensor_type.Layout().Dimensions()[1];
+    if (num_orig_patches > 0) {
+      LITERT_ASSIGN_OR_RETURN(
+          auto pos_span,
+          ReferTensorBufferAsSpan<int32_t>(input_maps.at(kPositionsXy)));
+      int last_x = pos_span[(num_orig_patches - 1) * 2];      // W - 1
+      int last_y = pos_span[(num_orig_patches - 1) * 2 + 1];  // H - 1
+      grid_thw[1] = last_y + 1;  // H_patches
+      grid_thw[2] = last_x + 1;  // W_patches
+    }
+  }
+  ExecutorVisionData result(std::move(output_tensor),
                             /*per_layer_embeddings=*/std::nullopt);
+  result.SetGridThwList({grid_thw});
+  return result;
 }
 
 absl::StatusOr<VisionExecutorProperties>

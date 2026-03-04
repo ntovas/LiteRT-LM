@@ -59,6 +59,7 @@
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/executor/litert_compiled_model_executor_utils.h"
 #include "runtime/executor/llm_executor_io_types.h"
+#include "runtime/executor/qwen35_position_ids.h"
 #include "runtime/executor/llm_executor_processed_tokens.h"
 #include "runtime/executor/llm_executor_settings.h"
 #include "runtime/executor/llm_litert_compiled_model_cache_utils.h"
@@ -547,6 +548,13 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::CreatePrefillInputBuffers(
     prefill_input_buffers[signatures_.input_int32_param.value()] =
         std::move(*param_tensor_buffer);
   }
+  if (signatures_.input_mrope_positions.has_value()) {
+    RETURN_IF_ERROR(dyn_shape_resolver(*signatures_.input_mrope_positions));
+    auto mrope_buf = compiled_model_.CreateInputBuffer(
+        prefill_signature, *signatures_.input_mrope_positions);
+    prefill_input_buffers[*signatures_.input_mrope_positions] =
+        std::move(*mrope_buf);
+  }
   return absl::OkStatus();
 }
 
@@ -819,6 +827,26 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
     ++llm_context_->runtime_state().current_step;
   }
 
+  // Fill 3D mRoPE positions if model supports it.
+  if (signatures_.input_mrope_positions.has_value()) {
+    std::vector<int32_t> ids_i32(ids.begin(), ids.end());
+    ASSIGN_OR_RETURN(
+        auto mrope_result,
+        ComputeQwen35MRoPEPositions(absl::MakeConstSpan(ids_i32),
+                                    mrope_pending_grid_thw_,
+                                    /*spatial_merge_size=*/2,
+                                    /*batch_size=*/1,
+                                    static_cast<int>(ids.size())));
+    auto& mrope_buf =
+        prefill_input_buffers[*signatures_.input_mrope_positions];
+    LITERT_ASSIGN_OR_RETURN(auto mrope_lock,
+                            TensorBufferScopedLock::Create(
+                                mrope_buf, TensorBuffer::LockMode::kWrite));
+    memcpy(mrope_lock.second, mrope_result.position_ids.data(),
+           mrope_result.position_ids.size() * sizeof(int32_t));
+    llm_context_->runtime_state().rope_deltas = mrope_result.rope_deltas;
+  }
+
   return BindTensorsAndRunPrefill(prefill_signature, prefill_input_buffers,
                                   async);
 }
@@ -1021,6 +1049,23 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::DecodeInternal(
     RETURN_IF_ERROR(FillSingleBufferCacheParamTensor(
         decode_input_buffers_[signatures_.input_int32_param.value()], step,
         1));
+  }
+
+  // Fill 3D mRoPE positions for decode if model supports it.
+  if (signatures_.input_mrope_positions.has_value() &&
+      !llm_context_->runtime_state().rope_deltas.empty()) {
+    const auto& rope_deltas = llm_context_->runtime_state().rope_deltas;
+    auto decode_positions = ComputeQwen35DecodePosition(
+        absl::MakeConstSpan(rope_deltas), step,
+        static_cast<int>(rope_deltas.size()));
+    auto& mrope_buf =
+        decode_input_buffers_[*signatures_.input_mrope_positions];
+    LITERT_ASSIGN_OR_RETURN(
+        auto mrope_lock,
+        TensorBufferScopedLock::Create(mrope_buf,
+                                       TensorBuffer::LockMode::kWrite));
+    memcpy(mrope_lock.second, decode_positions.data(),
+           decode_positions.size() * sizeof(int32_t));
   }
 
   return BindTensorsAndRunDecode(&output_logits);
@@ -1428,6 +1473,7 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::SetCurrentStep(int new_step) {
 
 absl::Status LlmLiteRtCompiledModelExecutorBase::Reset() {
   llm_context_->runtime_state().current_step = 0;
+  llm_context_->runtime_state().rope_deltas.clear();
   return absl::OkStatus();
 }
 
@@ -1449,6 +1495,13 @@ absl::StatusOr<int> LlmLiteRtCompiledModelExecutorBase::GetVocabSize() {
 
 absl::Status LlmLiteRtCompiledModelExecutorStatic::Prefill(
     const ExecutorInputs& inputs, const ExecutorPrefillParams& params) {
+  // Capture vision grid_thw for mRoPE position computation.
+  if (inputs.GetVisionDataPtr().ok()) {
+    mrope_pending_grid_thw_ =
+        (*inputs.GetVisionDataPtr())->GetGridThwList();
+  } else {
+    mrope_pending_grid_thw_.clear();
+  }
 
   int output_heads = 1;
   if (llm_context_->runtime_config().output_heads.has_value()) {

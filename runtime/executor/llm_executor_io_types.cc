@@ -14,12 +14,14 @@
 
 #include "runtime/executor/llm_executor_io_types.h"
 
+#include <array>
 #include <atomic>
 #include <ios>
 #include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
@@ -103,6 +105,15 @@ void ExecutorVisionData::SetEmbeddings(
 void ExecutorVisionData::SetPerLayerEmbeddings(
     std::optional<::litert::TensorBuffer>&& per_layer_embeddings) {
   per_layer_embeddings_ = std::move(per_layer_embeddings);
+}
+
+const std::vector<std::array<int, 3>>& ExecutorVisionData::GetGridThwList()
+    const {
+  return grid_thw_list_;
+}
+
+void ExecutorVisionData::SetGridThwList(std::vector<std::array<int, 3>> list) {
+  grid_thw_list_ = std::move(list);
 }
 
 // Helper function to print a field from StatusOr<const TensorBuffer*>

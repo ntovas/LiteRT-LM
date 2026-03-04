@@ -32,6 +32,7 @@ cc_library(
         ":gemma3_data_processor_config",
         ":generic_data_processor_config",
         ":qwen3_data_processor_config",
+        ":qwen3p5_data_processor_config",
     ],
 )
 
@@ -89,6 +90,11 @@ cc_library(
 )
 
 cc_library(
+    name = "qwen3p5_data_processor_config",
+    hdrs = ["qwen3p5_data_processor_config.h"],
+)
+
+cc_library(
     name = "model_data_processor",
     hdrs = ["model_data_processor.h"],
     deps = [
@@ -119,6 +125,8 @@ cc_library(
         ":model_data_processor",
         ":qwen3_data_processor",
         ":qwen3_data_processor_config",
+        ":qwen3p5_data_processor",
+        ":qwen3p5_data_processor_config",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -143,6 +151,7 @@ cc_test(
         ":model_data_processor",
         ":model_data_processor_factory",
         ":qwen3_data_processor_config",
+        ":qwen3p5_data_processor_config",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "//runtime/components:sentencepiece_tokenizer",
@@ -218,6 +227,52 @@ cc_test(
         ":qwen3_data_processor_config",
         "@com_google_googletest//:gtest_main",
         "@nlohmann_json//:json",
+        "//runtime/conversation:io_types",
+        "//runtime/engine:io_types",
+        "//runtime/util:test_utils",
+    ],
+)
+
+cc_library(
+    name = "qwen3p5_data_processor",
+    srcs = ["qwen3p5_data_processor.cc"],
+    hdrs = ["qwen3p5_data_processor.h"],
+    deps = [
+        ":data_utils",
+        ":model_data_processor",
+        ":qwen3p5_data_processor_config",
+        "@com_google_absl//absl/log:absl_log",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:string_view",
+        "@com_googlesource_code_re2//:re2",
+        "@litert//litert/cc:litert_layout",
+        "@nlohmann_json//:json",
+        "//runtime/components/preprocessor:image_preprocessor",
+        "//runtime/components/preprocessor:stb_image_preprocessor",
+        "//runtime/components/tool_use:parser_utils",
+        "//runtime/conversation:io_types",
+        "//runtime/engine:io_types",
+        "//runtime/util:litert_status_util",
+        "//runtime/util:memory_mapped_file",
+    ],
+)
+
+cc_test(
+    name = "qwen3p5_data_processor_test",
+    srcs = ["qwen3p5_data_processor_test.cc"],
+    data = [
+        "//runtime/components/preprocessor/testdata",
+    ],
+    deps = [
+        ":qwen3p5_data_processor",
+        ":qwen3p5_data_processor_config",
+        "@com_google_googletest//:gtest_main",
+        "@nlohmann_json//:json",
+        "//runtime/components/preprocessor:image_preprocessor",
+        "//runtime/components/preprocessor:stb_image_preprocessor",
         "//runtime/conversation:io_types",
         "//runtime/engine:io_types",
         "//runtime/util:test_utils",

@@ -15,6 +15,7 @@
 #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_EXECUTOR_IO_TYPES_H_
 #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_EXECUTOR_IO_TYPES_H_
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -22,6 +23,7 @@
 #include <ostream>
 #include <random>
 #include <utility>
+#include <vector>
 
 #include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
@@ -86,6 +88,10 @@ struct RuntimeState {
   // This is only used by the compiled model executor to determine whether
   // KVCache preparation for prefill or decode should be done.
   bool ran_decode = false;
+
+  // Persisted rope_deltas from last prefill, one entry per batch element.
+  // Used during decode for Qwen-style mRoPE continuation.
+  std::vector<int32_t> rope_deltas;
 };
 
 // A resource interface to hold the llm context.
@@ -248,9 +254,16 @@ class ExecutorVisionData {
   void SetPerLayerEmbeddings(
       std::optional<::litert::TensorBuffer>&& per_layer_embeddings);
 
+  // Getter/setter for mRoPE grid {T, H_patches, W_patches} per image.
+  // Populated by VisionLiteRtCompiledModelExecutor::Encode(map).
+  const std::vector<std::array<int, 3>>& GetGridThwList() const;
+  void SetGridThwList(std::vector<std::array<int, 3>> list);
+
  private:
   std::optional<::litert::TensorBuffer> embeddings_;
   std::optional<::litert::TensorBuffer> per_layer_embeddings_;
+  // Per-image grid [T, H_patches, W_patches] in original patch units.
+  std::vector<std::array<int, 3>> grid_thw_list_;
 };
 std::ostream& operator<<(std::ostream& os,
                          const ExecutorVisionData& vision_data);

@@ -65,6 +65,9 @@ struct ModelSignatures {
   std::optional<std::string> input_per_layer_embeddings;
   // Input int32 param signature name. For both prefill and decode.
   std::optional<std::string> input_int32_param;
+  // Optional Qwen-style 3D mRoPE positions. Shape [3, B, T] (prefill) /
+  // [3, B, 1] (decode).
+  std::optional<std::string> input_mrope_positions;
   // Output logits signature name. Necessary for decode.
   std::string output_logits;
 };

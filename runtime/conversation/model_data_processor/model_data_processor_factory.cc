@@ -36,6 +36,8 @@
 #include "runtime/conversation/model_data_processor/model_data_processor.h"
 #include "runtime/conversation/model_data_processor/qwen3_data_processor.h"
 #include "runtime/conversation/model_data_processor/qwen3_data_processor_config.h"
+#include "runtime/conversation/model_data_processor/qwen3p5_data_processor.h"
+#include "runtime/conversation/model_data_processor/qwen3p5_data_processor_config.h"
 #include "runtime/proto/llm_model_type.pb.h"
 #include "runtime/proto/token.pb.h"
 #include "runtime/util/status_macros.h"
@@ -213,6 +215,36 @@ absl::StatusOr<DataProcessorConfig> CreateQwen3DataProcessorConfig(
   return config;
 }
 
+absl::StatusOr<DataProcessorConfig> CreateQwen3p5DataProcessorConfig(
+    const proto::LlmModelType& model_type) {
+  if (!model_type.has_qwen3p5()) {
+    return absl::InvalidArgumentError(
+        "Qwen3p5 LlmModelType is required to create "
+        "Qwen3p5DataProcessorConfig.");
+  }
+  Qwen3p5DataProcessorConfig config;
+  const proto::Qwen3p5& qwen3p5 = model_type.qwen3p5();
+  if (qwen3p5.has_code_fence_start()) {
+    config.code_fence_start = qwen3p5.code_fence_start();
+  }
+  if (qwen3p5.has_code_fence_end()) {
+    config.code_fence_end = qwen3p5.code_fence_end();
+  }
+  if (qwen3p5.has_escape_fence_strings()) {
+    config.escape_fence_strings = qwen3p5.escape_fence_strings();
+  }
+  if (qwen3p5.has_tool_code_regex()) {
+    config.tool_code_regex = qwen3p5.tool_code_regex();
+  }
+  if (qwen3p5.has_thinking_start_token()) {
+    config.thinking_start_token = qwen3p5.thinking_start_token();
+  }
+  if (qwen3p5.has_thinking_end_token()) {
+    config.thinking_end_token = qwen3p5.thinking_end_token();
+  }
+  return config;
+}
+
 absl::StatusOr<DataProcessorConfig> CreateDataProcessorConfigFromLlmModelType(
     const proto::LlmModelType& model_type) {
   switch (model_type.model_type_case()) {
@@ -222,6 +254,8 @@ absl::StatusOr<DataProcessorConfig> CreateDataProcessorConfigFromLlmModelType(
     case proto::LlmModelType::kQwen3:
     case proto::LlmModelType::kQwen2P5:
       return CreateQwen3DataProcessorConfig(model_type);
+    case proto::LlmModelType::kQwen3P5:
+      return CreateQwen3p5DataProcessorConfig(model_type);
     case proto::LlmModelType::kGenericModel:
       return CreateGenericDataProcessorConfig(model_type);
     case proto::LlmModelType::kFunctionGemma:
@@ -245,6 +279,10 @@ absl::StatusOr<std::unique_ptr<ModelDataProcessor>> CreateModelDataProcessor(
     ABSL_LOG(INFO) << "Creating Qwen3DataProcessor";
     return Qwen3DataProcessor::Create(
         std::get<Qwen3DataProcessorConfig>(config), preface);
+  } else if (std::holds_alternative<Qwen3p5DataProcessorConfig>(config)) {
+    ABSL_LOG(INFO) << "Creating Qwen3p5DataProcessor";
+    return Qwen3p5DataProcessor::Create(
+        std::get<Qwen3p5DataProcessorConfig>(config), preface);
   } else if (std::holds_alternative<GenericDataProcessorConfig>(config)) {
     ABSL_LOG(INFO) << "Creating GenericDataProcessor";
     return GenericDataProcessor::Create(
