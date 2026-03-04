@@ -830,20 +830,36 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
   // Fill 3D mRoPE positions if model supports it.
   if (signatures_.input_mrope_positions.has_value()) {
     std::vector<int32_t> ids_i32(ids.begin(), ids.end());
+    const int result_seq_len = static_cast<int>(ids.size());
     ASSIGN_OR_RETURN(
         auto mrope_result,
         ComputeQwen35MRoPEPositions(absl::MakeConstSpan(ids_i32),
                                     mrope_pending_grid_thw_,
                                     /*spatial_merge_size=*/2,
                                     /*batch_size=*/1,
-                                    static_cast<int>(ids.size())));
+                                    result_seq_len));
     auto& mrope_buf =
         prefill_input_buffers[*signatures_.input_mrope_positions];
+    LITERT_ASSIGN_OR_RETURN(auto mrope_buf_type, mrope_buf.TensorType());
+    const auto& mrope_dims = mrope_buf_type.Layout().Dimensions();
+    // mrope_buf shape is [3, batch_size, buf_seq_len].
+    const int buf_seq_len = mrope_dims[mrope_dims.size() - 1];
     LITERT_ASSIGN_OR_RETURN(auto mrope_lock,
                             TensorBufferScopedLock::Create(
                                 mrope_buf, TensorBuffer::LockMode::kWrite));
-    memcpy(mrope_lock.second, mrope_result.position_ids.data(),
-           mrope_result.position_ids.size() * sizeof(int32_t));
+    auto* buf_ptr = static_cast<int32_t*>(mrope_lock.second);
+    LITERT_ASSIGN_OR_RETURN(auto mrope_buf_size, mrope_buf.PackedSize());
+    // Zero entire buffer so padded positions get mRoPE = 0.
+    memset(buf_ptr, 0, mrope_buf_size);
+    // Copy each mRoPE dimension separately to handle stride mismatch when
+    // result_seq_len < buf_seq_len (e.g. prompt shorter than prefill size).
+    const int batch_size = 1;
+    for (int dim = 0; dim < 3; ++dim) {
+      memcpy(buf_ptr + dim * batch_size * buf_seq_len,
+             mrope_result.position_ids.data() +
+                 dim * batch_size * result_seq_len,
+             batch_size * result_seq_len * sizeof(int32_t));
+    }
     llm_context_->runtime_state().rope_deltas = mrope_result.rope_deltas;
   }
 
@@ -1739,6 +1755,9 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
       gpu_compilation_options.EnableAllowSrcQuantizedFcConvOps(
           !advanced_settings.allow_src_quantized_fc_conv_ops.has_value() ||
           advanced_settings.allow_src_quantized_fc_conv_ops.value());
+      gpu_compilation_options.HintWaitingForCompletion(
+          advanced_settings.hint_waiting_for_completion.has_value() &&
+          advanced_settings.hint_waiting_for_completion.value());
       if (advanced_settings.is_benchmark) {
         gpu_compilation_options.SetSyncExecutionModeWaitType(
             GpuOptions::SyncExecutionModeWaitType::kActive);

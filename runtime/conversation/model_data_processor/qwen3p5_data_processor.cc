@@ -99,13 +99,13 @@ Qwen3p5DataProcessor::ToInputDataVectorImpl(
 
   // Set up image preprocessing parameters (dynamic resolution via patchify).
   // patch_size=16 is fixed by the Qwen3.5 ViT architecture.
-  // max_num_patches=INT_MAX means no artificial cap: the model's own
-  // max_pixels constraint (16,777,216 px) naturally bounds memory usage.
+  // The vision encoder is compiled with a static shape matching 576 patches
+  // (384×384 images → 24×24 grid of 16×16 patches = 576 patches).
   ImagePreprocessParameter image_params;
   image_params.SetPatchifyConfig(
       {.patch_width = 16,
        .patch_height = 16,
-       .max_num_patches = std::numeric_limits<int>::max()});
+       .max_num_patches = 576});
 
   // Replace image placeholders with preprocessed image data.
   RE2 re_delimiter(
