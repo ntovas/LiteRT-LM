@@ -16,10 +16,10 @@
 #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_CORE_SESSION_ADVANCED_H_
 
 #include <atomic>
-#include <memory>
 #include <optional>
 #include <vector>
 
+#include "absl/base/thread_annotations.h"  // from @com_google_absl
 #include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/container/flat_hash_set.h"  // from @com_google_absl
 #include "absl/functional/any_invocable.h"  // from @com_google_absl
@@ -27,6 +27,7 @@
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
+#include "absl/synchronization/mutex.h"  // from @com_google_absl
 #include "absl/time/time.h"  // from @com_google_absl
 #include "runtime/components/tokenizer.h"
 #include "runtime/engine/engine.h"
@@ -115,13 +116,14 @@ class SessionAdvanced : public Engine::Session {
   RunTextScoringAsync(
       const std::vector<absl::string_view>& target_text,
       absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback,
-      bool store_token_lengths) override;
+      bool store_token_lengths) override ABSL_LOCKS_EXCLUDED(mutex_);
 
   absl::Status RunPrefill(const std::vector<InputData>& contents) override;
 
   absl::StatusOr<std::unique_ptr<TaskController>> RunPrefillAsync(
       const std::vector<InputData>& contents,
-      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) override;
+      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) override
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
   absl::StatusOr<Responses> RunDecode() override;
 
@@ -129,13 +131,15 @@ class SessionAdvanced : public Engine::Session {
       const DecodeConfig& decode_config) override;
 
   absl::StatusOr<std::unique_ptr<TaskController>> RunDecodeAsync(
-      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) override;
+      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) override
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
   absl::StatusOr<std::unique_ptr<TaskController>> RunDecodeAsync(
       absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback,
-      const DecodeConfig& decode_config) override;
+      const DecodeConfig& decode_config) override ABSL_LOCKS_EXCLUDED(mutex_);
 
-  absl::StatusOr<BenchmarkInfo> GetBenchmarkInfo() override;
+  absl::StatusOr<BenchmarkInfo> GetBenchmarkInfo() override
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
   absl::StatusOr<BenchmarkInfo*> GetMutableBenchmarkInfo() override;
 
@@ -169,11 +173,13 @@ class SessionAdvanced : public Engine::Session {
   }
 
   // TODO b/409401231 - Add unit tests for this function.
-  absl::StatusOr<std::unique_ptr<Session>> Clone() override;
+  absl::StatusOr<std::unique_ptr<Session>> Clone() override
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
   // TODO b/409401231 - Add unit tests for this function.
   absl::StatusOr<std::unique_ptr<Session>> CloneAsync(
-      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) override;
+      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback) override
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
  private:
   // The state of the session.
@@ -202,6 +208,11 @@ class SessionAdvanced : public Engine::Session {
         session_state_(session_state),
         last_task_ids_(last_task_ids) {}
 
+  // The implementation of CloneAsync which assumes mutex_ is locked.
+  absl::StatusOr<std::unique_ptr<Session>> CloneAsyncLocked(
+      absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+
   // The session ID used for the session.
   SessionId session_id_;
 
@@ -215,10 +226,13 @@ class SessionAdvanced : public Engine::Session {
   std::shared_ptr<const SessionInfo> session_info_;
 
   // The state of the session.
-  SessionState session_state_;
+  SessionState session_state_ ABSL_GUARDED_BY(mutex_);
 
   // The last task IDs that might be executing in the session.
-  absl::flat_hash_set<TaskId> last_task_ids_ = {};
+  absl::flat_hash_set<TaskId> last_task_ids_ ABSL_GUARDED_BY(mutex_) = {};
+
+  // Mutex for protecting the session state and last task IDs.
+  absl::Mutex mutex_;
 };
 
 }  // namespace litert::lm
