@@ -1812,11 +1812,11 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
     input_kv_cache_buffers[input_name] = std::move(input_buffer);
   }
   for (auto output_name : prefill_signature.OutputNames()) {
-    LITERT_ASSIGN_OR_RETURN(
-        auto output_buffer,
-        compiled_model.CreateOutputBuffer(prefill_signature_key, output_name));
     if (IsKVCacheTensor(output_name)) {
       if (backend == Backend::GPU) {
+        LITERT_ASSIGN_OR_RETURN(auto output_buffer,
+                                compiled_model.CreateOutputBuffer(
+                                    prefill_signature_key, output_name));
         output_kv_cache_buffers[output_name] = std::move(output_buffer);
       }
       // For CPU, we will use single buffer for kv cache input and output to
