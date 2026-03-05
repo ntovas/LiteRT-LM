@@ -183,36 +183,41 @@ absl::Status Fill(TensorBuffer& tensor_buffer, uint16_t value) {
   return absl::OkStatus();
 }
 
+template <typename T>
+absl::StatusOr<int> FindMaxIndex(const TensorBuffer& decoded_logits) {
+  LITERT_ASSIGN_OR_RETURN(auto logits_buffer,
+                          CopyFromTensorBuffer<T>(decoded_logits));
+  if (logits_buffer.empty()) {
+    return absl::InvalidArgumentError("Logits buffer is empty.");
+  }
+  int max_index = 0;
+  T max_value = std::numeric_limits<T>::min();
+  for (int i = 0; i < logits_buffer.size(); ++i) {
+    if (logits_buffer[i] > max_value) {
+      max_value = logits_buffer[i];
+      max_index = i;
+    }
+  }
+  return max_index;
+}
+
 // Applies greedy sampling to the decoded logits. TODO(b/416702864) this logic
 // should be replaced by the LiteRT-LM sampler once it supports greedy sampling
 // for quantized tensors.
 absl::StatusOr<int> ApplyGreedySampling(const TensorBuffer& decoded_logits) {
-  int max_index = 0;
   LITERT_ASSIGN_OR_RETURN(RankedTensorType logits_tensor_type,
                           decoded_logits.TensorType());
   if (logits_tensor_type.ElementType() == ::litert::ElementType::Float32) {
-    LITERT_ASSIGN_OR_RETURN(auto logits_buffer_float,
-                            CopyFromTensorBuffer<float>(decoded_logits));
-
-    float max_value = std::numeric_limits<float>::min();
-    for (int i = 0; i < logits_buffer_float.size(); ++i) {
-      if (logits_buffer_float[i] > max_value) {
-        max_value = logits_buffer_float[i];
-        max_index = i;
-      }
-    }
+    return FindMaxIndex<float>(decoded_logits);
+  } else if (logits_tensor_type.ElementType() == ::litert::ElementType::Int16) {
+    return FindMaxIndex<int16_t>(decoded_logits);
+  } else if (logits_tensor_type.ElementType() == ::litert::ElementType::Int8) {
+    return FindMaxIndex<int8_t>(decoded_logits);
   } else {
-    LITERT_ASSIGN_OR_RETURN(auto logits_buffer_int16,
-                            CopyFromTensorBuffer<int16_t>(decoded_logits));
-    int16_t max_value = std::numeric_limits<int16_t>::min();
-    for (int i = 0; i < logits_buffer_int16.size(); ++i) {
-      if (logits_buffer_int16[i] > max_value) {
-        max_value = logits_buffer_int16[i];
-        max_index = i;
-      }
-    }
+    return absl::InvalidArgumentError(
+        absl::StrCat("Unsupported tensor element type for greedy sampling: ",
+                     logits_tensor_type.ElementType()));
   }
-  return max_index;
 }
 
 // Returns true if the transformer model has a per layer embedder input buffer.
