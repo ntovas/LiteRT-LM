@@ -209,6 +209,16 @@ struct AdvancedSettings {
   // performance at the risk of reducing quality.
   std::optional<bool> allow_src_quantized_fc_conv_ops;
 
+  // If true, the executor hints waiting for completion. This is to wait for all
+  // the enqueued commands to be completed after each invoke.
+  // This feature is only applied to the OpenCL backend and the goal is to fix
+  // a known quality issue on AMD and Mali GPUs.
+  // This flag is by default nullopt, which means the decision is made by the
+  // runtime.
+  // And for runtime, by default, it is false. But if we are running a Generic
+  // model (most OSS models) on AMD or Mali GPU, we would set this flag to true.
+  std::optional<bool> hint_waiting_for_completion;
+
   bool operator==(const AdvancedSettings& other) const {
     return prefill_batch_sizes == other.prefill_batch_sizes &&
            num_output_candidates == other.num_output_candidates &&
@@ -232,7 +242,8 @@ struct AdvancedSettings {
            share_constant_tensors == other.share_constant_tensors &&
            sampler_handles_input == other.sampler_handles_input &&
            allow_src_quantized_fc_conv_ops ==
-               other.allow_src_quantized_fc_conv_ops;
+               other.allow_src_quantized_fc_conv_ops &&
+           hint_waiting_for_completion == other.hint_waiting_for_completion;
   }
 };
 std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings);

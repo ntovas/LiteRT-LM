@@ -260,6 +260,16 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
     main_executor_settings_.SetAdvancedSettings(advanced_settings);
   }
 
+  if (!advanced_settings.hint_waiting_for_completion.has_value()) {
+    // Enable a hint for waiting for completion for generic models on GPU.
+    advanced_settings.hint_waiting_for_completion =
+        metadata.has_llm_model_type() &&
+        metadata.llm_model_type().has_generic_model();
+    ABSL_LOG(INFO) << "hint_waiting_for_completion: "
+                   << advanced_settings.hint_waiting_for_completion.value();
+    main_executor_settings_.SetAdvancedSettings(advanced_settings);
+  }
+
   // TODO: b/482450588 - Remove this once the bug is fixed.
   if (metadata.has_llm_model_type() &&
       metadata.llm_model_type().has_function_gemma()) {

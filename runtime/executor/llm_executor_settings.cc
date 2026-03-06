@@ -89,6 +89,12 @@ std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings) {
   } else {
     os << "allow_src_quantized_fc_conv_ops: Not set\n";
   }
+  if (settings.hint_waiting_for_completion.has_value()) {
+    os << "hint_waiting_for_completion: "
+       << settings.hint_waiting_for_completion.value() << "\n";
+  } else {
+    os << "hint_waiting_for_completion: Not set\n";
+  }
   return os;
 }
 

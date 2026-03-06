@@ -276,6 +276,7 @@ TEST(LlmExecutorConfigTest, LlmExecutorSettingsWithAdvancedSettings) {
       .share_constant_tensors = false,
       .sampler_handles_input = false,
       .allow_src_quantized_fc_conv_ops = true,
+      .hint_waiting_for_completion = false,
   });
 
   std::stringstream oss;
@@ -323,6 +324,7 @@ cache_compiled_shaders_only: 1
 share_constant_tensors: 0
 sampler_handles_input: 0
 allow_src_quantized_fc_conv_ops: 1
+hint_waiting_for_completion: 0
 
 )");
   EXPECT_EQ(oss.str(), expected_output);
