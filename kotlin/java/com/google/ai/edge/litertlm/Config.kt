@@ -20,10 +20,17 @@ package com.google.ai.edge.litertlm
  *
  * This is the Kotlin version of the C++'s `litert::lm::Backend`.
  */
-enum class Backend {
-  CPU, // CPU LiteRT backend.
-  GPU, // GPU LiteRT backend.
-  NPU, // NPU LiteRT backend.
+sealed class Backend(val name: String) {
+
+  /**
+   * @property numOfThreads The number of threads to use for CPU backend. When `null` or 0, use the
+   *   default value from the native engine.
+   */
+  data class CPU(val numOfThreads: Int? = null) : Backend("CPU")
+
+  class GPU : Backend("GPU")
+
+  class NPU : Backend("NPU")
 }
 
 /**
@@ -43,7 +50,7 @@ enum class Backend {
  */
 data class EngineConfig(
   val modelPath: String,
-  val backend: Backend = Backend.CPU,
+  val backend: Backend = Backend.CPU(),
   val visionBackend: Backend? = null,
   val audioBackend: Backend? = null,
   val maxNumTokens: Int? = null,

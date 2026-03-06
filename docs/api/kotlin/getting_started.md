@@ -85,7 +85,7 @@ import com.google.ai.edge.litertlm.EngineConfig
 
 val engineConfig = EngineConfig(
     modelPath = "/path/to/your/model.litertlm", // Replace with your model path
-    backend = Backend.CPU, // Or Backend.GPU
+    backend = Backend.CPU(), // Or Backend.GPU()
     // Optional: Pick a writable dir. This can improve 2nd load time.
     // cacheDir = "/tmp/" or context.cacheDir.path (for Android)
 )
@@ -230,9 +230,9 @@ Note: This only works with models with multi-modality support, e.g., the
 // Initialize the `visionBackend` and/or the `audioBackend`
 val engineConfig = EngineConfig(
     modelPath = "/path/to/your/model.litertlm", // Replace with your model path
-    backend = Backend.CPU, // Or Backend.GPU
-    visionBackend = Backend.GPU,
-    audioBackend = Backend.CPU,
+    backend = Backend.CPU(), // Or Backend.GPU()
+    visionBackend = Backend.GPU(),
+    audioBackend = Backend.CPU(),
 )
 
 // Sends a message with multi-modality.

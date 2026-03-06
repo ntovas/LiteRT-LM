@@ -62,6 +62,12 @@ class Engine(val engineConfig: EngineConfig) : AutoCloseable {
     synchronized(lock) {
       check(!isInitialized()) { "Engine is already initialized." }
 
+      val mainBackendNumThreads =
+        (engineConfig.backend as? Backend.CPU)?.numOfThreads?.let { if (it > 0) it else -1 } ?: -1
+      val audioBackendNumThreads =
+        (engineConfig.audioBackend as? Backend.CPU)?.numOfThreads?.let { if (it > 0) it else -1 }
+          ?: -1
+
       handle =
         LiteRtLmJni.nativeCreateEngine(
           engineConfig.modelPath,
@@ -74,6 +80,8 @@ class Engine(val engineConfig: EngineConfig) : AutoCloseable {
           engineConfig.cacheDir ?: "",
           @OptIn(ExperimentalApi::class) ExperimentalFlags.enableBenchmark,
           @OptIn(ExperimentalApi::class) ExperimentalFlags.npuLibrariesDir,
+          mainBackendNumThreads,
+          audioBackendNumThreads,
         )
     }
   }

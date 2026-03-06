@@ -40,6 +40,8 @@ internal object LiteRtLmJni {
    * @param cacheDir The directory for cache files.
    * @param enableBenchmark Whether to enable benchmark or not.
    * @param npuLibrariesDir The directory for the NPU libraries.
+   * @param mainBackendNumThreads The number of threads for the main backend (CPU).
+   * @param audioBackendNumThreads The number of threads for the audio backend (CPU).
    * @return A pointer to the native engine instance.
    */
   external fun nativeCreateEngine(
@@ -51,6 +53,8 @@ internal object LiteRtLmJni {
     cacheDir: String,
     enableBenchmark: Boolean,
     npuLibrariesDir: String,
+    mainBackendNumThreads: Int,
+    audioBackendNumThreads: Int,
   ): Long
 
   /**

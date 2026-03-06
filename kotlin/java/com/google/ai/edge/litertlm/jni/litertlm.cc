@@ -38,6 +38,7 @@
 #include "runtime/engine/engine_settings.h"
 #include "runtime/engine/io_types.h"
 #include "runtime/executor/executor_settings_base.h"
+#include "runtime/executor/llm_executor_settings.h"
 #include "runtime/proto/sampler_params.pb.h"
 #include "tflite/logger.h"  // from @litert
 #include "tflite/minimal_logging.h"  // from @litert
@@ -360,7 +361,8 @@ LITERTLM_JNIEXPORT void JNICALL JNI_METHOD(nativeSetMinLogSeverity)(
 LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
     JNIEnv* env, jclass thiz, jstring model_path, jstring backend,
     jstring vision_backend, jstring audio_backend, jint max_num_tokens,
-    jstring cache_dir, jboolean enable_benchmark, jstring npu_libraries_dir) {
+    jstring cache_dir, jboolean enable_benchmark, jstring npu_libraries_dir,
+    jint main_backend_num_threads, jint audio_backend_num_threads) {
   const char* model_path_chars = env->GetStringUTFChars(model_path, nullptr);
   std::string model_path_str(model_path_chars);
   env->ReleaseStringUTFChars(model_path, model_path_chars);
@@ -464,6 +466,21 @@ LITERTLM_JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
 
   if (max_num_tokens > 0) {
     settings->GetMutableMainExecutorSettings().SetMaxNumTokens(max_num_tokens);
+  }
+
+  if (main_backend_num_threads > 0) {
+    auto cpu_config = settings->GetMutableMainExecutorSettings()
+                          .MutableBackendConfig<litert::lm::CpuConfig>();
+    if (cpu_config.ok()) {
+      litert::lm::CpuConfig config = *cpu_config;
+      config.number_of_threads = main_backend_num_threads;
+      settings->GetMutableMainExecutorSettings().SetBackendConfig(config);
+    }
+  }
+
+  if (audio_backend_optional.has_value() && audio_backend_num_threads > 0) {
+    settings->GetMutableAudioExecutorSettings()->SetNumThreads(
+        audio_backend_num_threads);
   }
 
   if (enable_benchmark) {

@@ -24,7 +24,7 @@ suspend fun main(args: Array<String>) {
     requireNotNull(args.getOrNull(0)) { "Model path must be provided as the first argument." }
 
   @OptIn(ExperimentalApi::class)
-  val benchmarkInfo = benchmark(modelPath = modelPath, backend = Backend.CPU)
+  val benchmarkInfo = benchmark(modelPath = modelPath, backend = Backend.CPU())
   println(YELLOW + "Benchmark result: $benchmarkInfo" + RESET)
 }
 
