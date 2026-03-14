@@ -182,5 +182,33 @@ TEST(ModelTypeUtilsTest, GetDefaultJinjaPromptTemplateWithImageAndAudio) {
             "<start_of_turn>model\n");
 }
 
+TEST(ModelTypeUtilsTest, GetDefaultJinjaPromptTemplateQwen35UsesPromptAffixes) {
+  proto::PromptTemplates prompt_templates;
+  prompt_templates.mutable_user()->set_prefix("<|im_start|>user\n");
+  prompt_templates.mutable_model()->set_prefix("<|im_start|>assistant\n");
+  prompt_templates.mutable_system()->set_prefix("<|im_start|>system\n");
+  prompt_templates.mutable_user()->set_suffix("<|im_end|>\n");
+  prompt_templates.mutable_model()->set_suffix("<|im_end|>\n");
+  prompt_templates.mutable_system()->set_suffix("<|im_end|>\n");
+  proto::LlmModelType llm_model_type;
+  llm_model_type.mutable_qwen3p5();
+  ASSERT_OK_AND_ASSIGN(
+      auto jinja_prompt_template,
+      GetDefaultJinjaPromptTemplate(prompt_templates, llm_model_type));
+  PromptTemplate prompt_template(jinja_prompt_template);
+  PromptTemplateInput prompt_template_input;
+  prompt_template_input.messages = {
+      {{"role", "system"}, {"content", "sys"}},
+      {{"role", "user"}, {"content", "usr"}},
+      {{"role", "model"}, {"content", "asst"}}};
+  ASSERT_OK_AND_ASSIGN(auto rendered_prompt,
+                       prompt_template.Apply(prompt_template_input));
+  EXPECT_EQ(rendered_prompt,
+            "<|im_start|>system\nsys<|im_end|>\n"
+            "<|im_start|>user\nusr<|im_end|>\n"
+            "<|im_start|>assistant\nasst<|im_end|>\n"
+            "<|im_start|>assistant\n");
+}
+
 }  // namespace
 }  // namespace litert::lm

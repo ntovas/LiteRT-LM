@@ -29,6 +29,7 @@
 #include "runtime/components/tool_use/fc_parser_utils.h"
 #include "runtime/components/tool_use/json_parser_utils.h"
 #include "runtime/components/tool_use/python_parser_utils.h"
+#include "runtime/components/tool_use/qwen3p5_parser_utils.h"
 #include "re2/re2.h"  // from @com_googlesource_code_re2
 
 namespace litert::lm {
@@ -77,6 +78,7 @@ SyntaxType GetSyntaxType(absl::string_view syntax_type) {
           {"python", SyntaxType::kPython},
           {"json", SyntaxType::kJson},
           {"fc", SyntaxType::kFc},
+          {"qwen3p5_xml", SyntaxType::kQwen3p5Xml},
       });
   auto it = kStringToSyntaxType->find(syntax_type);
   if (it == kStringToSyntaxType->end()) {
@@ -131,6 +133,8 @@ absl::StatusOr<nlohmann::ordered_json> ParseTextAndToolCalls(
         tool_calls = ParseJsonExpression(code_block);
       } else if (syntax_type == SyntaxType::kFc) {
         tool_calls = ParseFcExpression(code_block);
+      } else if (syntax_type == SyntaxType::kQwen3p5Xml) {
+        tool_calls = ParseQwen3p5ToolCalls(code_block);
       } else {
         return absl::InvalidArgumentError(absl::StrCat(
             "Unsupported syntax type: ", static_cast<int>(syntax_type)));

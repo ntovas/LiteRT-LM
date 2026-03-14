@@ -23,6 +23,7 @@
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "runtime/components/prompt_template.h"
 #include "runtime/components/tokenizer.h"
 #include "runtime/conversation/io_types.h"
@@ -36,6 +37,8 @@
 #include "runtime/conversation/model_data_processor/model_data_processor.h"
 #include "runtime/conversation/model_data_processor/qwen3_data_processor.h"
 #include "runtime/conversation/model_data_processor/qwen3_data_processor_config.h"
+#include "runtime/conversation/model_data_processor/qwen3p5_data_processor.h"
+#include "runtime/conversation/model_data_processor/qwen3p5_data_processor_config.h"
 #include "runtime/proto/llm_model_type.pb.h"
 #include "runtime/proto/token.pb.h"
 #include "runtime/util/status_macros.h"
@@ -214,6 +217,36 @@ absl::StatusOr<DataProcessorConfig> CreateQwen3DataProcessorConfig(
   return config;
 }
 
+absl::StatusOr<DataProcessorConfig> CreateQwen3p5DataProcessorConfig(
+    const proto::LlmModelType& model_type) {
+  if (!model_type.has_qwen3p5()) {
+    return absl::InvalidArgumentError(
+        "Qwen3.5 LlmModelType is required to create "
+        "Qwen3p5DataProcessorConfig.");
+  }
+  Qwen3p5DataProcessorConfig config;
+  if (model_type.qwen3p5().has_code_fence_start()) {
+    config.code_fence_start = model_type.qwen3p5().code_fence_start();
+  }
+  if (model_type.qwen3p5().has_code_fence_end()) {
+    config.code_fence_end = model_type.qwen3p5().code_fence_end();
+  }
+  if (model_type.qwen3p5().has_escape_fence_strings()) {
+    config.escape_fence_strings = model_type.qwen3p5().escape_fence_strings();
+  }
+  if (model_type.qwen3p5().has_tool_code_regex()) {
+    config.tool_code_regex = model_type.qwen3p5().tool_code_regex();
+  }
+  if (model_type.qwen3p5().has_tool_call_syntax() &&
+      model_type.qwen3p5().tool_call_syntax() != "qwen3p5_xml") {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Unsupported Qwen3.5 tool call syntax: ",
+        model_type.qwen3p5().tool_call_syntax()));
+  }
+  config.tool_call_syntax = Qwen3p5ToolCallSyntax::kQwen3p5Xml;
+  return config;
+}
+
 absl::StatusOr<DataProcessorConfig> CreateDataProcessorConfigFromLlmModelType(
     const proto::LlmModelType& model_type) {
   switch (model_type.model_type_case()) {
@@ -223,6 +256,8 @@ absl::StatusOr<DataProcessorConfig> CreateDataProcessorConfigFromLlmModelType(
     case proto::LlmModelType::kQwen3:
     case proto::LlmModelType::kQwen2P5:
       return CreateQwen3DataProcessorConfig(model_type);
+    case proto::LlmModelType::kQwen3P5:
+      return CreateQwen3p5DataProcessorConfig(model_type);
     case proto::LlmModelType::kGenericModel:
       return CreateGenericDataProcessorConfig(model_type);
     case proto::LlmModelType::kFunctionGemma:
@@ -246,6 +281,10 @@ absl::StatusOr<std::unique_ptr<ModelDataProcessor>> CreateModelDataProcessor(
     ABSL_LOG(INFO) << "Creating Qwen3DataProcessor";
     return Qwen3DataProcessor::Create(
         std::get<Qwen3DataProcessorConfig>(config), preface);
+  } else if (std::holds_alternative<Qwen3p5DataProcessorConfig>(config)) {
+    ABSL_LOG(INFO) << "Creating Qwen3p5DataProcessor";
+    return Qwen3p5DataProcessor::Create(
+        std::get<Qwen3p5DataProcessorConfig>(config), preface);
   } else if (std::holds_alternative<GenericDataProcessorConfig>(config)) {
     ABSL_LOG(INFO) << "Creating GenericDataProcessor";
     return GenericDataProcessor::Create(

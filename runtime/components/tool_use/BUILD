@@ -186,6 +186,30 @@ cc_test(
 )
 
 cc_library(
+    name = "qwen3p5_parser_utils",
+    srcs = ["qwen3p5_parser_utils.cc"],
+    hdrs = ["qwen3p5_parser_utils.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@nlohmann_json//:json",
+        "//runtime/util:litert_status_util",
+    ],
+)
+
+cc_test(
+    name = "qwen3p5_parser_utils_test",
+    srcs = ["qwen3p5_parser_utils_test.cc"],
+    deps = [
+        ":qwen3p5_parser_utils",
+        "@com_google_googletest//:gtest_main",
+        "@nlohmann_json//:json",
+        "//runtime/util:test_utils",
+    ],
+)
+
+cc_library(
     name = "parser_utils",
     srcs = ["parser_utils.cc"],
     hdrs = ["parser_utils.h"],
@@ -193,6 +217,7 @@ cc_library(
         ":fc_parser_utils",
         ":json_parser_utils",
         ":python_parser_utils",
+        ":qwen3p5_parser_utils",
         "@com_google_absl//absl/base:no_destructor",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",

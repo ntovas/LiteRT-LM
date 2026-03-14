@@ -1,0 +1,25 @@
+<|im_start|>system
+# Tools
+
+<tools>
+{"type": "function", "function": {"name": "GetWeather", "description": "Get the weather of the location.", "parameters": {"type": "object", "properties": {"location": {"type": "string", "description": "The location to get the weather for."}}, "required": ["location"]}}}
+</tools>
+
+Return each function call as:
+<tool_call>
+<function=<function-name>>
+<parameter=<arg-name>><value></parameter>
+</function>
+</tool_call><|im_end|>
+<|im_start|>system
+I am The System!<|im_end|>
+<|im_start|>user
+I need help<|im_end|>
+<|im_start|>assistant
+Hi, what can I do for you?<|im_end|>
+<|im_start|>user
+Write a poem about a cat<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>

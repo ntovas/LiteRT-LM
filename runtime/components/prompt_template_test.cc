@@ -25,6 +25,7 @@
 #include <gtest/gtest.h>
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/match.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/time/civil_time.h"  // from @com_google_absl
@@ -42,7 +43,8 @@ constexpr char kTestdataDir[] =
 
 constexpr absl::string_view kTestModelTemplates[] = {
     "google-gemma-3n-e2b-it", "Qwen-Qwen3-0.6B", "HuggingFaceTB-SmolLM3-3B",
-    "microsoft-Phi-4-mini-instruct", "bos-token-test"};
+    "microsoft-Phi-4-mini-instruct", "bos-token-test",
+    "Qwen-Qwen3.5-0.8B", "Qwen-Qwen3.5-2B"};
 
 json GetMessageSystem() {
   return {
@@ -140,6 +142,35 @@ TEST_P(PromptTemplateTest, CreateTest) {
   ASSERT_OK_AND_ASSIGN(const std::string golden_content,
                        GetContents(golden_file_path));
   EXPECT_EQ(rendered_prompt, golden_content);
+}
+
+TEST(PromptTemplateStandaloneTest, Qwen35DefaultThinkingBehavior) {
+  ASSERT_OK_AND_ASSIGN(
+      const std::string no_think_template,
+      GetContents(GetTestdataPath("Qwen-Qwen3.5-0.8B.jinja")));
+  ASSERT_OK_AND_ASSIGN(
+      const std::string think_template,
+      GetContents(GetTestdataPath("Qwen-Qwen3.5-2B.jinja")));
+
+  PromptTemplate no_think_prompt(no_think_template);
+  PromptTemplate think_prompt(think_template);
+
+  PromptTemplateInput input{
+      .messages = json::array({GetMessageUserTextTurn1()}),
+      .tools = json::array(),
+      .add_generation_prompt = true,
+  };
+
+  ASSERT_OK_AND_ASSIGN(const std::string no_think_rendered,
+                       no_think_prompt.Apply(input));
+  ASSERT_OK_AND_ASSIGN(const std::string think_rendered,
+                       think_prompt.Apply(input));
+
+  EXPECT_THAT(no_think_rendered,
+              testing::HasSubstr("<|im_start|>assistant\n<think>\n\n</think>\n\n"));
+  EXPECT_FALSE(absl::EndsWith(
+      think_rendered, "<|im_start|>assistant\n<think>\n\n</think>\n\n"));
+  EXPECT_THAT(think_rendered, testing::HasSubstr("<|im_start|>assistant\n"));
 }
 
 INSTANTIATE_TEST_SUITE_P(

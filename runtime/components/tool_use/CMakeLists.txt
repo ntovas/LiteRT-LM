@@ -138,6 +138,29 @@ target_link_libraries(runtime_components_tool_use_fc_parser_utils
     LITERTLM_DEPS
 )
 
+add_litertlm_library(runtime_components_tool_use_qwen3p5_parser_utils STATIC
+  qwen3p5_parser_utils.cc
+)
+add_library(LiteRTLM::Runtime::Components::ToolUse::Qwen3p5Utils
+  ALIAS runtime_components_tool_use_qwen3p5_parser_utils)
+
+target_include_directories(runtime_components_tool_use_qwen3p5_parser_utils
+  PRIVATE
+    ${GENERATED_SRC_DIR}
+    ${LITERTLM_INCLUDE_PATHS}
+)
+
+target_link_libraries(runtime_components_tool_use_qwen3p5_parser_utils
+  PUBLIC
+    runtime_util_litert_status_util
+    LITERTLM_DEPS
+)
+
+target_link_libraries(runtime_components_tool_use_parser_utils
+  PUBLIC
+    LiteRTLM::Runtime::Components::ToolUse::Qwen3p5Utils
+)
+
 add_litertlm_library(runtime_components_tool_use_fc_tool_format_utils STATIC
   fc_tool_format_utils.cc
 )
@@ -172,5 +195,6 @@ target_link_libraries(runtime_components_tool_use_libs INTERFACE
   LiteRTLM::Runtime::Components::ToolUse::PythonFormatUtils
   LiteRTLM::Runtime::Components::ToolUse::FcFormatUtils
   LiteRTLM::Runtime::Components::ToolUse::FcFormatUtils
+  LiteRTLM::Runtime::Components::ToolUse::Qwen3p5Utils
 
 )

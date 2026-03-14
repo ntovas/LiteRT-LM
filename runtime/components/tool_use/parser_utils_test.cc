@@ -27,6 +27,7 @@ using ::testing::status::IsOkAndHolds;
 TEST(ParserUtilsTest, GetSyntaxType) {
   EXPECT_EQ(GetSyntaxType("python"), SyntaxType::kPython);
   EXPECT_EQ(GetSyntaxType("json"), SyntaxType::kJson);
+  EXPECT_EQ(GetSyntaxType("qwen3p5_xml"), SyntaxType::kQwen3p5Xml);
   EXPECT_EQ(GetSyntaxType("unknown"), SyntaxType::kUnknown);
 }
 
@@ -590,6 +591,37 @@ This is some more text.
                       "name": "tool_2",
                       "arguments": {
                         "y": 2
+                      }
+                    }
+                  }
+                ]
+              })json")));
+}
+
+TEST(ParserUtilsTest, ParseQwen3p5ToolCalls) {
+  EXPECT_THAT(ParseTextAndToolCalls(
+                  "Let me check.\n<tool_call>\n"
+                  "<function=get_weather>"
+                  "<parameter=location>\"Paris\"</parameter>"
+                  "</function>\n"
+                  "</tool_call>",
+                  /*code_fence_start=*/"<tool_call>",
+                  /*code_fence_end=*/"</tool_call>",
+                  /*syntax_type=*/SyntaxType::kQwen3p5Xml),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Let me check.\n"
+                  }
+                ],
+                "tool_calls": [
+                  {
+                    "type": "function",
+                    "function": {
+                      "name": "get_weather",
+                      "arguments": {
+                        "location": "Paris"
                       }
                     }
                   }

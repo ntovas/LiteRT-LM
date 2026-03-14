@@ -1,0 +1,41 @@
+{%- set enable_thinking = enable_thinking if enable_thinking is defined else true -%}
+{%- if tools %}
+{{- '<|im_start|>system\n# Tools\n\n<tools>\n' -}}
+{%- for tool in tools %}
+{{- tool | tojson + '\n' -}}
+{%- endfor %}
+{{- '</tools>\n\nReturn each function call as:\n<tool_call>\n<function=<function-name>>\n<parameter=<arg-name>><value></parameter>\n</function>\n</tool_call><|im_end|>\n' -}}
+{%- endif %}
+{%- for message in messages %}
+{%- if message.role == "system" %}
+{{- '<|im_start|>system\n' + message.content + '<|im_end|>\n' -}}
+{%- elif message.role == "user" %}
+{{- '<|im_start|>user\n' + message.content + '<|im_end|>\n' -}}
+{%- elif message.role == "assistant" %}
+{{- '<|im_start|>assistant\n' -}}
+{%- if message.reasoning_content is string %}
+{{- '<think>\n' + message.reasoning_content + '\n</think>\n\n' -}}
+{%- endif %}
+{{- message.content -}}
+{%- if message.tool_calls %}
+{%- for tool_call in message.tool_calls %}
+{{- '\n<tool_call>\n<function=' -}}
+{%- if tool_call.function %}
+{{- tool_call.function.name -}}
+{%- else %}
+{{- tool_call.name -}}
+{%- endif %}
+{{- '>\n</function>\n</tool_call>' -}}
+{%- endfor %}
+{%- endif %}
+{{- '<|im_end|>\n' -}}
+{%- elif message.role == "tool" %}
+{{- '<|im_start|>tool\n' + message.content + '<|im_end|>\n' -}}
+{%- endif %}
+{%- endfor %}
+{%- if add_generation_prompt %}
+{{- '<|im_start|>assistant\n' -}}
+{%- if not enable_thinking %}
+{{- '<think>\n\n</think>\n\n' -}}
+{%- endif %}
+{%- endif %}
